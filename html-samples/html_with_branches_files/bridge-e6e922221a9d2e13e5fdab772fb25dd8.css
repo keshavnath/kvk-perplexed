@@ -1,0 +1,100 @@
+/* line 1, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-header__link {
+  border-bottom: none;
+}
+
+/* line 5, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-header-search__form {
+  margin-bottom: 0;
+}
+
+/* line 9, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-header-search__input {
+  height: 36px !important;
+  border-right: none !important;
+}
+
+/* line 14, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-header-search__option {
+  margin-bottom: 0;
+}
+
+/* line 18, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-header-search__radio {
+  margin: 0 4px 0 0 !important;
+  vertical-align: initial;
+}
+
+/* line 23, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-header-search__checkbox {
+  margin: 0 4px 0 0 !important;
+  vertical-align: initial;
+}
+
+/* line 28, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-footer__heading {
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+/* line 32, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-footer__column ul {
+  margin: 12px 0;
+}
+
+/* line 36, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.prefooter {
+  min-height: 20px;
+}
+
+/* line 40, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-modal__button {
+  text-transform: none;
+  text-shadow: none;
+}
+
+/* line 45, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-modal__dismiss {
+  border-bottom: none;
+}
+
+/* line 49, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-api-plan__button {
+  border-bottom: none;
+}
+
+/* line 53, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.oc-api-plan__button:hover {
+  color: white;
+}
+
+/* line 57, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+#page_container {
+  padding-top: 20px;
+}
+
+/* line 61, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.span6 .oc-api-plans {
+  display: block;
+  margin-top: -20px;
+  font-size: 0;
+}
+
+/* line 67, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.span6 .oc-api-plans__column {
+  display: inline-block;
+  vertical-align: top;
+  float: none;
+  margin-left: 0;
+  margin-top: 20px;
+  width: 50%;
+}
+
+/* line 76, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.span6 .oc-api-plan {
+  margin-right: 20px;
+}
+
+/* line 80, /home/openc/app/app/assets/stylesheets/fixes/bridge.scss */
+.span6 .oc-api-plan--selected {
+  padding-bottom: 20px;
+}

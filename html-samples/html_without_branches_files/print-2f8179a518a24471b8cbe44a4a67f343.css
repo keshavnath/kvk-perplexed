@@ -1,0 +1,12 @@
+/* line 3, /home/openc/app/app/assets/stylesheets/print.scss */
+body {
+  color: #000000;
+  background-color: #ffffff;
+  font-family: Helvetica, Segoe, "Segoe UI", Arial, sans-serif;
+}
+
+/* Hide controls */
+/* line 11, /home/openc/app/app/assets/stylesheets/print.scss */
+#flash-alert, .header .search, .header .etc {
+  display: none;
+}
