@@ -30,6 +30,16 @@ class CompanyDB:
             result = cursor.fetchone()
             return result is not None
 
+    def is_failed_result(self, kvk_number):
+        """Check if a company has a failed result (-1)"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                'SELECT has_branches FROM companies WHERE kvk_number = ? AND has_branches = -1', 
+                (kvk_number,)
+            )
+            result = cursor.fetchone()
+            return result is not None
+
     def store_result(self, company_name, kvk_number, has_branches):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
