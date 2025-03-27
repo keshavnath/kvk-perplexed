@@ -14,9 +14,9 @@ class CompanyDB:
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS companies (
+                    company_name TEXT NOT NULL,
                     kvk_number TEXT PRIMARY KEY,
-                    has_branches BOOLEAN,
-                    check_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    has_branches BOOLEAN
                 )
             ''')
             conn.commit()
@@ -30,11 +30,13 @@ class CompanyDB:
             result = cursor.fetchone()
             return result is not None
 
-    def store_result(self, kvk_number, has_branches):
+    def store_result(self, company_name, kvk_number, has_branches):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                'INSERT OR REPLACE INTO companies (kvk_number, has_branches) VALUES (?, ?)',
-                (kvk_number, has_branches)
+                '''INSERT OR REPLACE INTO companies 
+                   (company_name, kvk_number, has_branches) 
+                   VALUES (?, ?, ?)''',
+                (company_name, kvk_number, has_branches)
             )
             conn.commit()
-            logger.debug(f"Stored result for KvK {kvk_number}: has_branches={has_branches}")
+            logger.debug(f"Stored result for {company_name} (KvK {kvk_number}): has_branches={has_branches}")

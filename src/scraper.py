@@ -29,7 +29,7 @@ class CompanyScraper:
         self.driver = webdriver.Chrome(options=chrome_options)
         self.wait = WebDriverWait(self.driver, 10)
         
-    def check_company_size(self, kvk_number):
+    def check_company_size(self, company_name, kvk_number):
         try:
             url = f"{self.base_url}{kvk_number}"
             logger.debug(f"Requesting URL: {url}")
@@ -61,12 +61,12 @@ class CompanyScraper:
                 branch_table and 'branch' in branch_table.get_text().lower()
             )
             
-            logger.info(f"KvK {kvk_number}: {'Has branches' if has_branches else 'No branches detected'}")
+            logger.info(f"{company_name} (KvK {kvk_number}): {'Has branches' if has_branches else 'No branches detected'}")
             return has_branches
             
         except Exception as e:
-            logger.error(f"Error processing KvK {kvk_number}: {str(e)}")
-            return False
+            logger.error(f"Error processing {company_name} (KvK {kvk_number}): {str(e)}")
+            return None
     
     def __del__(self):
         if hasattr(self, 'driver'):

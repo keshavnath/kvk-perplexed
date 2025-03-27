@@ -3,6 +3,15 @@ from tqdm import tqdm
 import pandas as pd
 import argparse
 import re
+from datetime import datetime
+import os
+from database import CompanyDB
+
+def get_default_log_filename():
+    """Generate default log filename with timestamp and process ID"""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    pid = os.getpid()
+    return f"kvk_scraper_{timestamp}_pid{pid}.log"
 
 def setup_logging(level=logging.INFO, log_file=None):
     # Create formatters
@@ -69,14 +78,14 @@ def clean_kvk_number(kvk):
 
 from scraper import CompanyScraper
 
-def create_big_company_database(input_file, limit=None):
+def create_big_company_database(input_file, db_path="companies.db", limit=None):
     """
-    Create database of big companies from input file containing KvK numbers and company names
+    Process companies and store results in SQL database
     Args:
         input_file: Path to input CSV file
+        db_path: Path to SQLite database
         limit: Optional maximum number of rows to process
     """
-    # Read input database
     logger.info(f"Reading input file: {input_file}")
     df = pd.read_csv(input_file)
     if limit:
@@ -85,47 +94,44 @@ def create_big_company_database(input_file, limit=None):
     
     total_companies = len(df)
     logger.info(f"Processing {total_companies} companies")
+    
     scraper = CompanyScraper()
+    db = CompanyDB(db_path)
     
-    big_companies = []
-    company_names = []
-    
-    # Modified progress bar with clear position and count
     with tqdm(total=total_companies, desc="Processing companies", unit="company") as pbar:
         for _, row in df.iterrows():
             kvk = clean_kvk_number(row['kvk_number'])
+            company_name = row['company_name']
+            
             if kvk is None:
                 logger.warning(f"Skipping invalid KvK number: {row['kvk_number']}")
                 pbar.update(1)
                 continue
                 
-            if scraper.check_company_size(kvk):
-                big_companies.append(kvk)
-                company_names.append(row['company_name'])
+            # Skip if already checked
+            if db.has_been_checked(kvk):
+                logger.debug(f"Already processed {company_name} (KvK {kvk})")
+                pbar.update(1)
+                continue
+            
+            # Process and store immediately
+            result = scraper.check_company_size(company_name, kvk)
+            if result is not None:
+                db.store_result(company_name, kvk, result)
             pbar.update(1)
-    
-    logger.info(f"Found {len(big_companies)} big companies")
-    big_companies_df = pd.DataFrame({
-        'company_name': company_names,
-        'kvk_number': big_companies
-    })
-    
-    return big_companies_df
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Create database of big companies from input CSV file')
+    parser = argparse.ArgumentParser(description='Process companies and store results in database')
     parser.add_argument('input_file', type=str, help='Path to input CSV file with kvk_number and company_name columns')
-    parser.add_argument('--output', type=str, default='big_companies.csv', help='Output CSV file path (default: big_companies.csv)')
+    parser.add_argument('--db-path', type=str, default='companies.db', help='SQLite database path (default: companies.db)')
     parser.add_argument('--limit', type=int, help='Only process the first N rows of the input file')
-    parser.add_argument('--log-file', type=str, default = 'runlog.txt', help='Save logs to specified file')
+    parser.add_argument('--log-file', type=str, default=get_default_log_filename(), 
+                       help='Save logs to specified file')
     
     args = parser.parse_args()
-    
     setup_logging(log_file=args.log_file)
+    logger = logging.getLogger(__name__)
     
-    logger = logging.getLogger(__name__)  # Get main module logger
-    logger.info("Starting big company database creation")
-    
-    big_companies_df = create_big_company_database(args.input_file, args.limit)
-    big_companies_df.to_csv(args.output, index=False)
-    logger.info(f"Processed companies saved to {args.output}")
+    logger.info("Starting company processing")
+    create_big_company_database(args.input_file, args.db_path, args.limit)
+    logger.info("Processing complete")
