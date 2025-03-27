@@ -1,9 +1,15 @@
 # KvK Company Size Analyzer
 
-A tool to identify "big" companies in the Netherlands based on their branch/subsidiary structure using OpenCorporates data.
+A tool for analyzing Dutch companies based on their branch structure and collecting detailed company information using OpenCorporates and Perplexity.
 
 ## Overview
-This tool analyzes Dutch companies by their KvK (Chamber of Commerce) numbers to determine if they are "big" companies, defined as companies that have branches or subsidiaries listed on OpenCorporates.
+This project consists of two main phases:
+1. **Current Phase (Branch Analysis)**: Identifies "big" companies by analyzing their branch/subsidiary structure using OpenCorporates data
+2. **Future Phase (Company Details)**: Will collect detailed information about identified big companies using Perplexity, including:
+   - Location and geographic distribution
+   - Industry sector and subsectors
+   - Company size estimates (employees, revenue)
+   - Additional business intelligence
 
 ## Requirements
 - Python 3.7+
@@ -60,6 +66,41 @@ The script:
 - Ability to retry previously failed checks
 - Detailed logging with timestamp-based filenames
 - Progress bar with live statistics
+
+## Project Status
+
+### Currently Implemented
+- Company size determination through branch analysis
+- Persistent SQLite storage of results
+- Failed result tracking and retry capability
+- Detailed logging system
+- Progress tracking and statistics
+
+### Planned Features
+- Integration with Perplexity for detailed company analysis
+- Extended database schema for company details
+- Rich company profiles including:
+  - Geographic data
+  - Industry classification
+  - Size metrics
+  - Business relationships
+- Analysis and export tools for collected data
+
+## Technical Details
+
+### Current Database Schema
+The SQLite database currently stores:
+- Company name
+- KvK number
+- Branch status (true/false/-1 for failed checks)
+
+### Future Schema Extensions (Planned)
+Will be extended to include:
+- Company location data
+- Industry classifications
+- Size indicators
+- Last update timestamps
+- Data confidence metrics
 
 ## Notes
 - Processing speed is limited due to web scraping
