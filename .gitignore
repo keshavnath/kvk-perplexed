@@ -1,5 +1,7 @@
-﻿# Python virtual environment
-venv/
-my_data/
+﻿venv/
+data
+data/*
 *.csv
-html-samples/
+html-samples
+html-samples/*
+**/__pycache__/**
