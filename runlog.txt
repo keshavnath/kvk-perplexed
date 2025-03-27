@@ -38,3 +38,23 @@
 2025-03-27 20:05:36 - scraper - WARNING - Not a valid OpenCorporates page for KvK 64312100.0
 2025-03-27 20:05:36 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/63661438.0
 2025-03-27 20:05:38 - scraper - WARNING - Not a valid OpenCorporates page for KvK 63661438.0
+2025-03-27 20:15:06 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/16051874
+2025-03-27 20:15:09 - scraper - INFO - KvK 16051874: No branches detected
+2025-03-27 20:15:09 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/17037842
+2025-03-27 20:15:12 - scraper - INFO - KvK 17037842: No branches detected
+2025-03-27 20:15:12 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/83892869
+2025-03-27 20:15:15 - scraper - INFO - KvK 83892869: No branches detected
+2025-03-27 20:15:15 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/82701695
+2025-03-27 20:15:17 - scraper - INFO - KvK 82701695: No branches detected
+2025-03-27 20:15:17 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/24257403
+2025-03-27 20:15:20 - scraper - INFO - KvK 24257403: No branches detected
+2025-03-27 20:15:20 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/58806415
+2025-03-27 20:15:22 - scraper - INFO - KvK 58806415: No branches detected
+2025-03-27 20:15:22 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/61829420
+2025-03-27 20:15:25 - scraper - INFO - KvK 61829420: No branches detected
+2025-03-27 20:15:25 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/69299544
+2025-03-27 20:15:28 - scraper - INFO - KvK 69299544: No branches detected
+2025-03-27 20:15:28 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/68933223
+2025-03-27 20:15:31 - scraper - INFO - KvK 68933223: Has branches
+2025-03-27 20:15:31 - scraper - DEBUG - Requesting URL: https://opencorporates.com/companies/nl/63719444
+2025-03-27 20:15:33 - scraper - INFO - KvK 63719444: No branches detected
