@@ -7,6 +7,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from proxy_manager import ProxyManager
 
 # Create module-level logger
 logger = logging.getLogger('scraper')
@@ -19,9 +20,10 @@ class RateLimitException(Exception):
 class CompanyScraper:
     def __init__(self):
         self.base_url = "https://opencorporates.com/companies/nl/"
+        self.proxy_manager = ProxyManager()
         self.setup_browser()
-        
-    def setup_browser(self):
+    
+    def setup_browser(self, proxy=None):
         chrome_options = Options()
         chrome_options.add_argument('--headless')  # Run in headless mode
         chrome_options.add_argument('--no-sandbox')
@@ -30,10 +32,44 @@ class CompanyScraper:
         chrome_options.add_argument('--window-size=1920x1080')
         chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
+        if proxy:
+            chrome_options.add_argument(f'--proxy-server={proxy}')
+        
+        if hasattr(self, 'driver'):
+            self.driver.quit()
+        
         self.driver = webdriver.Chrome(options=chrome_options)
         self.wait = WebDriverWait(self.driver, 10)
+    
+    def check_company_size(self, company_name, kvk_number, max_retries=3):
+        last_exception = None
         
-    def check_company_size(self, company_name, kvk_number):
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:  # On retry, get new proxy
+                    proxy = self.proxy_manager.get_proxy()
+                    if proxy:
+                        logger.info(f"Retrying with new proxy: {proxy}")
+                        self.setup_browser(proxy)
+                    
+                return self._check_company_size_impl(company_name, kvk_number)
+                
+            except RateLimitException as e:
+                last_exception = e
+                logger.warning(f"Rate limit with current proxy (attempt {attempt + 1}/{max_retries})")
+                continue
+                
+            except Exception as e:
+                last_exception = e
+                logger.error(f"Error on attempt {attempt + 1}: {str(e)}")
+                break
+        
+        if last_exception:
+            raise last_exception
+        return None
+    
+    def _check_company_size_impl(self, company_name, kvk_number):
+        """Implementation of the actual check (moved from original check_company_size)"""
         try:
             url = f"{self.base_url}{kvk_number}"
             logger.debug(f"Requesting URL: {url}")
@@ -78,12 +114,11 @@ class CompanyScraper:
             logger.info(f"{company_name} (KvK {kvk_number}): {'Has branches' if has_branches else 'No branches detected'}")
             return has_branches
             
-        except RateLimitException:
-            logger.error(f"Stopping processing due to rate limit for {company_name} (KvK {kvk_number})")
-            return None
-        except Exception as e:
-            logger.error(f"Error processing {company_name} (KvK {kvk_number}): {str(e)}")
-            return None
+        except Exception as e:  # Only catch non-RateLimit exceptions
+            if not isinstance(e, RateLimitException):
+                logger.error(f"Error processing {company_name} (KvK {kvk_number}): {str(e)}")
+                return None
+            raise  # Re-raise RateLimitException
     
     def __del__(self):
         if hasattr(self, 'driver'):

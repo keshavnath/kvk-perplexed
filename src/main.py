@@ -157,13 +157,14 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
                         stats['none_results'] += 1
                         db.store_result(company_name, kvk, -1)  # Store None results as -1
                         logger.debug(f"Got None result for {company_name} (KvK {kvk})")
+                    pbar.update(1)
                 except RateLimitException:
                     logger.error(f"Rate limit reached. Stopping at index {current_index}")
                     logger.error("To resume, use: --start-index {}".format(current_index))
-                    return  # Exit processing
-                
-                pbar.update(1)
+                    raise  # Re-raise to exit processing
     
+    except RateLimitException:
+        logger.info("Exiting due to rate limit...")
     finally:
         # Log statistics even if we hit rate limit
         logger.info("Processing statistics (up to index {}):".format(current_index))
