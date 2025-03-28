@@ -7,6 +7,7 @@ from datetime import datetime
 import os
 from database import CompanyDB
 from pathlib import Path
+from scraper import CompanyScraper, RateLimitException
 
 def get_default_log_filename():
     """Generate default log filename with timestamp and process ID in logs directory"""
@@ -85,22 +86,25 @@ def clean_kvk_number(kvk):
         logger.error(f"Error cleaning KvK number {kvk}: {str(e)}")
         return None
 
-from scraper import CompanyScraper
-
-def create_big_company_database(input_file, db_path="companies.db", limit=None, retry_failed=False):
+def create_big_company_database(input_file, db_path="companies.db", start_index=None, end_index=None, retry_failed=False):
     """
     Process companies and store results in SQL database
     Args:
         input_file: Path to input CSV file
         db_path: Path to SQLite database
-        limit: Optional maximum number of rows to process
+        start_index: Optional starting index for processing (inclusive)
+        end_index: Optional ending index for processing (exclusive)
         retry_failed: If True, retry companies that previously returned None
     """
     logger.info(f"Reading input file: {input_file}")
     df = pd.read_csv(input_file)
-    if limit:
-        logger.info(f"Limiting to first {limit} rows")
-        df = df.head(limit)
+    
+    # Handle index bounds
+    if start_index is not None or end_index is not None:
+        start = start_index if start_index is not None else 0
+        end = end_index if end_index is not None else len(df)
+        logger.info(f"Processing rows {start} to {end}")
+        df = df.iloc[start:end]
     
     total_companies = len(df)
     logger.info(f"Processing {total_companies} companies")
@@ -118,49 +122,60 @@ def create_big_company_database(input_file, db_path="companies.db", limit=None, 
         'stored_false': 0
     }
     
-    with tqdm(total=total_companies, desc="Processing companies", unit="company") as pbar:
-        for _, row in df.iterrows():
-            kvk = clean_kvk_number(row['kvk_number'])
-            company_name = row['company_name']
-            
-            if kvk is None:
-                stats['skipped_invalid_kvk'] += 1
-                logger.warning(f"Skipping invalid KvK number: {row['kvk_number']}")
-                pbar.update(1)
-                continue
+    current_index = start if start_index is not None else 0
+    try:
+        with tqdm(total=total_companies, desc="Processing companies", unit="company") as pbar:
+            for idx, (_, row) in enumerate(df.iterrows()):
+                current_index = idx + (start_index if start_index is not None else 0)
+                kvk = clean_kvk_number(row['kvk_number'])
+                company_name = row['company_name']
                 
-            # Skip if already checked, unless it's a failed result and we want to retry
-            if db.has_been_checked(kvk):
-                if retry_failed and db.is_failed_result(kvk):
-                    logger.debug(f"Retrying previously failed {company_name} (KvK {kvk})")
-                else:
-                    stats['skipped_already_checked'] += 1
-                    logger.debug(f"Already processed {company_name} (KvK {kvk})")
+                if kvk is None:
+                    stats['skipped_invalid_kvk'] += 1
+                    logger.warning(f"Skipping invalid KvK number: {row['kvk_number']}")
                     pbar.update(1)
                     continue
-            
-            # Process and store immediately
-            result = scraper.check_company_size(company_name, kvk)
-            if result is not None:
-                stats['stored_true' if result else 'stored_false'] += 1
-                db.store_result(company_name, kvk, result)
-                logger.debug(f"Stored result for {company_name} (KvK {kvk}): {result}")
-            else:
-                stats['none_results'] += 1
-                db.store_result(company_name, kvk, -1)  # Store None results as -1
-                logger.debug(f"Got None result for {company_name} (KvK {kvk})")
-            pbar.update(1)
+                    
+                # Skip if already checked, unless it's a failed result and we want to retry
+                if db.has_been_checked(kvk):
+                    if retry_failed and db.is_failed_result(kvk):
+                        logger.debug(f"Retrying previously failed {company_name} (KvK {kvk})")
+                    else:
+                        stats['skipped_already_checked'] += 1
+                        logger.debug(f"Already processed {company_name} (KvK {kvk})")
+                        pbar.update(1)
+                        continue
+                
+                try:
+                    # Process and store immediately
+                    result = scraper.check_company_size(company_name, kvk)
+                    if result is not None:
+                        stats['stored_true' if result else 'stored_false'] += 1
+                        db.store_result(company_name, kvk, result)
+                        logger.debug(f"Stored result for {company_name} (KvK {kvk}): {result}")
+                    else:
+                        stats['none_results'] += 1
+                        db.store_result(company_name, kvk, -1)  # Store None results as -1
+                        logger.debug(f"Got None result for {company_name} (KvK {kvk})")
+                except RateLimitException:
+                    logger.error(f"Rate limit reached. Stopping at index {current_index}")
+                    logger.error("To resume, use: --start-index {}".format(current_index))
+                    return  # Exit processing
+                
+                pbar.update(1)
     
-    # Log statistics at the end
-    logger.info("Processing statistics:")
-    for key, value in stats.items():
-        logger.info(f"  {key}: {value}")
+    finally:
+        # Log statistics even if we hit rate limit
+        logger.info("Processing statistics (up to index {}):".format(current_index))
+        for key, value in stats.items():
+            logger.info(f"  {key}: {value}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process companies and store results in database')
     parser.add_argument('input_file', type=str, help='Path to input CSV file with kvk_number and company_name columns')
     parser.add_argument('--db-path', type=str, default='./db/companies.db', help='SQLite database path (default: ./db/companies.db)')
-    parser.add_argument('--limit', type=int, help='Only process the first N rows of the input file')
+    parser.add_argument('--start-index', type=int, help='Starting row index to process (inclusive)')
+    parser.add_argument('--end-index', type=int, help='Ending row index to process (exclusive)')
     parser.add_argument('--log-file', type=str, default=get_default_log_filename(), 
                        help='Save logs to specified file')
     parser.add_argument('--retry-failed', action='store_true', 
@@ -171,5 +186,5 @@ if __name__ == "__main__":
     logger = logging.getLogger(__name__)
     
     logger.info("Starting company processing")
-    create_big_company_database(args.input_file, args.db_path, args.limit, args.retry_failed)
+    create_big_company_database(args.input_file, args.db_path, args.start_index, args.end_index, args.retry_failed)
     logger.info("Processing complete")

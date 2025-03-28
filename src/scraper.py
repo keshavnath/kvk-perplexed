@@ -12,6 +12,10 @@ from selenium.webdriver.support import expected_conditions as EC
 logger = logging.getLogger('scraper')
 logger.setLevel(logging.DEBUG)
 
+class RateLimitException(Exception):
+    """Raised when rate limiting is detected"""
+    pass
+
 class CompanyScraper:
     def __init__(self):
         self.base_url = "https://opencorporates.com/companies/nl/"
@@ -42,6 +46,16 @@ class CompanyScraper:
             
             soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
+            # Rate limit detection based on actual response page
+            message_div = soup.find('div', id='message')
+            if message_div and any(phrase in message_div.get_text().lower() for phrase in [
+                'higher than expected rate',
+                'accessing opencorporates at a higher than expected rate',
+                'ip address may be accessing opencorporates at a higher'
+            ]):
+                logger.error(f"Rate limit detected while processing {company_name} (KvK {kvk_number})")
+                raise RateLimitException("Rate limit detected")
+            
             # Verify we're on a company page
             title = soup.find('title')
             if not title or 'OpenCorporates' not in title.text:
@@ -64,6 +78,9 @@ class CompanyScraper:
             logger.info(f"{company_name} (KvK {kvk_number}): {'Has branches' if has_branches else 'No branches detected'}")
             return has_branches
             
+        except RateLimitException:
+            logger.error(f"Stopping processing due to rate limit for {company_name} (KvK {kvk_number})")
+            return None
         except Exception as e:
             logger.error(f"Error processing {company_name} (KvK {kvk_number}): {str(e)}")
             return None
