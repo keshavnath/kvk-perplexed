@@ -11,7 +11,7 @@ logger.setLevel(logging.DEBUG)
 class ProxyManager:
     def __init__(self, min_proxies=5):
         self.proxies = []
-        self.last_update = None
+        self.last_update = datetime.now()  # Initialize with current time
         self.min_proxies = min_proxies
         self.update_interval = timedelta(minutes=30)
     
@@ -41,11 +41,24 @@ class ProxyManager:
         try:
             response = requests.get('https://free-proxy-list.net/')
             soup = BeautifulSoup(response.text, 'html.parser')
-            for row in soup.find('table').find_all('tr')[1:]:
-                cols = row.find_all('td')
-                if len(cols) >= 7 and cols[6].text.strip() == 'yes':  # HTTPS proxy
-                    proxy = f"{cols[0].text.strip()}:{cols[1].text.strip()}"
-                    proxies.add(proxy)
+            # Look for table within specific class or structure
+            table = soup.find('table', {'class': 'table table-striped table-bordered'})
+            if not table:
+                table = soup.find('table')  # Fallback to any table
+            
+            if table:
+                for row in table.find_all('tr')[1:]:  # Skip header row
+                    cols = row.find_all('td')
+                    if len(cols) >= 7:
+                        ip = cols[0].text.strip()
+                        port = cols[1].text.strip()
+                        https = cols[6].text.strip().lower() == 'yes'
+                        if https:
+                            proxy = f"{ip}:{port}"
+                            proxies.add(proxy)
+            else:
+                logger.warning("No proxy table found in response")
+                
         except Exception as e:
             logger.error(f"Error fetching from free-proxy-list.net: {e}")
         
