@@ -18,6 +18,26 @@ class RateLimitException(Exception):
     pass
 
 class CompanyScraper:
+    @staticmethod
+    def is_rate_limited(html_content):
+        """Check if HTML content indicates rate limiting"""
+        soup = BeautifulSoup(html_content, 'html.parser')
+        message_div = soup.find('div', id='message')
+        
+        if message_div:
+            message_text = message_div.get_text().lower()
+            logger.debug(f"Found message div: {message_text}")
+            
+            rate_limit_phrases = [
+                'higher than expected rate',
+                'accessing opencorporates at a higher than expected rate',
+                'ip address may be accessing opencorporates at a higher'
+            ]
+            
+            return any(phrase in message_text for phrase in rate_limit_phrases)
+        
+        return False
+
     def __init__(self):
         self.base_url = "https://opencorporates.com/companies/nl/"
         self.proxy_manager = ProxyManager()
@@ -80,17 +100,11 @@ class CompanyScraper:
             # Wait for page to load
             self.wait.until(EC.presence_of_element_located((By.TAG_NAME, 'title')))
             
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-            
-            # Rate limit detection based on actual response page
-            message_div = soup.find('div', id='message')
-            if message_div and any(phrase in message_div.get_text().lower() for phrase in [
-                'higher than expected rate',
-                'accessing opencorporates at a higher than expected rate',
-                'ip address may be accessing opencorporates at a higher'
-            ]):
+            if self.is_rate_limited(self.driver.page_source):
                 logger.error(f"Rate limit detected while processing {company_name} (KvK {kvk_number})")
                 raise RateLimitException("Rate limit detected")
+            
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
             
             # Verify we're on a company page
             title = soup.find('title')

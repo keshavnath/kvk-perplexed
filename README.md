@@ -36,13 +36,14 @@ python src/main.py input.csv
 
 Options:
 - `--db-path`: Specify SQLite database path (default: ./db/companies.db)
-- `--limit`: Process only first N companies
-- `--log-file`: Specify log file location (default: ./logs/kvk_scraper_TIMESTAMP_pidNUM.log)
+- `--start-index`: Starting row index to process (inclusive)
+- `--end-index`: Ending row index to process (exclusive)
+- `--log-dir`: Directory to store log files (default: ./logs/kvk_scraper_TIMESTAMP_pidNUM/)
 - `--retry-failed`: Retry processing companies that previously failed
 
 Example:
 ```bash
-python src/main.py companies.csv --limit 100 --retry-failed
+python src/main.py companies.csv --start-index 100 --retry-failed
 ```
 
 ## Input Format
@@ -66,6 +67,37 @@ The script:
 - Ability to retry previously failed checks
 - Detailed logging with timestamp-based filenames
 - Progress bar with live statistics
+
+## Logging
+The script creates separate log files for each component:
+- `scraper.log`: Company scraping and branch detection logs
+- `database.log`: Database operations and storage logs
+- `proxy.log`: Proxy fetching, validation and rotation logs
+
+All logs are stored in a timestamped directory:
+```
+logs/
+    kvk_scraper_YYYYMMDD_HHMMSS_pidNUM/
+        scraper.log
+        database.log
+        proxy.log
+```
+
+## Testing
+Run all tests:
+```bash
+python -m pytest
+```
+
+Run specific test categories:
+```bash
+python -m pytest -m rate_limit  # Only rate limit tests
+python -m pytest -m branches    # Only branch detection tests
+```
+
+Test files:
+- `test_scraper.py`: Tests for scraping and rate limit detection
+- `test_proxy_manager.py`: Tests for proxy handling
 
 ## Project Status
 

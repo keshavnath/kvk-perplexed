@@ -9,15 +9,20 @@ from database import CompanyDB
 from pathlib import Path
 from scraper import CompanyScraper, RateLimitException
 
-def get_default_log_filename():
-    """Generate default log filename with timestamp and process ID in logs directory"""
+def get_default_log_directory():
+    """Generate default log directory with timestamp and process ID"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     pid = os.getpid()
-    logs_dir = Path('./logs')
-    logs_dir.mkdir(exist_ok=True)
-    return str(logs_dir / f"kvk_scraper_{timestamp}_pid{pid}.log")
+    logs_dir = Path('./logs') / f"kvk_scraper_{timestamp}_pid{pid}"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    return logs_dir
 
-def setup_logging(level=logging.INFO, log_file=None):
+def setup_logging(level=logging.INFO, log_dir=None):
+    if log_dir:
+        log_dir = Path(log_dir)
+    else:
+        log_dir = get_default_log_directory()
+
     # Create formatters
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -31,25 +36,26 @@ def setup_logging(level=logging.INFO, log_file=None):
     # Console handler - for main module
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
-    # Only show main module logs in console
     console_handler.addFilter(lambda record: record.name == "__main__")
     root_logger.addHandler(console_handler)
     
-    # File handler - for scraper and database modules with DEBUG level
-    if log_file:
-        file_handler = logging.FileHandler(log_file)
+    # Configure module loggers
+    modules = {
+        'scraper': 'scraper.log',
+        'database': 'database.log',
+        'proxy': 'proxy.log'
+    }
+    
+    for module, filename in modules.items():
+        # Setup module logger
+        logger = logging.getLogger(module)
+        logger.setLevel(logging.DEBUG)
+        
+        # Add file handler for this module
+        file_handler = logging.FileHandler(log_dir / filename)
         file_handler.setFormatter(formatter)
         file_handler.setLevel(logging.DEBUG)
-        
-        # Setup scraper logger
-        scraper_logger = logging.getLogger('scraper')
-        scraper_logger.addHandler(file_handler)
-        scraper_logger.setLevel(logging.DEBUG)
-        
-        # Setup database logger
-        db_logger = logging.getLogger('database')
-        db_logger.addHandler(file_handler)
-        db_logger.setLevel(logging.DEBUG)
+        logger.addHandler(file_handler)
     
     # Quiet noisy loggers
     logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -177,13 +183,13 @@ if __name__ == "__main__":
     parser.add_argument('--db-path', type=str, default='./db/companies.db', help='SQLite database path (default: ./db/companies.db)')
     parser.add_argument('--start-index', type=int, help='Starting row index to process (inclusive)')
     parser.add_argument('--end-index', type=int, help='Ending row index to process (exclusive)')
-    parser.add_argument('--log-file', type=str, default=get_default_log_filename(), 
-                       help='Save logs to specified file')
+    parser.add_argument('--log-dir', type=str, default=None,
+                       help='Directory to store log files (default: ./logs/kvk_scraper_TIMESTAMP_pidNUM/)')
     parser.add_argument('--retry-failed', action='store_true', 
                        help='Retry processing companies that previously failed')
     
     args = parser.parse_args()
-    setup_logging(log_file=args.log_file)
+    setup_logging(log_dir=args.log_dir)
     logger = logging.getLogger(__name__)
     
     logger.info("Starting company processing")
