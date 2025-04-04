@@ -89,10 +89,16 @@ Run all tests:
 python -m pytest
 ```
 
-Run specific test categories:
+Run specific test categories using markers:
 ```bash
-python -m pytest -m rate_limit  # Only rate limit tests
-python -m pytest -m branches    # Only branch detection tests
+pytest -m rate_limit     # Only rate limit tests
+pytest -m branches       # Only branch detection tests
+```
+
+Run tests by name matching:
+```bash
+pytest -k "rate"        # Run any test with "rate" in the name
+pytest -k "TestRateLimit"  # Run specific test class
 ```
 
 Test files:

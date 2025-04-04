@@ -23,20 +23,25 @@ def setup_logging(level=logging.INFO, log_dir=None):
     else:
         log_dir = get_default_log_directory()
 
-    # Create formatters
+    # Create formatters for different levels
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    error_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s\nStack trace:\n%(exc_info)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
     # Setup root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(level)
+    root_logger.setLevel(logging.DEBUG)  # Capture all levels
     
-    # Console handler - for main module
+    # Console handler - for main module, show INFO and above
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     console_handler.addFilter(lambda record: record.name == "__main__")
+    console_handler.setLevel(logging.INFO)
     root_logger.addHandler(console_handler)
     
     # Configure module loggers
@@ -47,15 +52,20 @@ def setup_logging(level=logging.INFO, log_dir=None):
     }
     
     for module, filename in modules.items():
-        # Setup module logger
         logger = logging.getLogger(module)
-        logger.setLevel(logging.DEBUG)
+        logger.setLevel(logging.DEBUG)  # Capture all levels
         
-        # Add file handler for this module
-        file_handler = logging.FileHandler(log_dir / filename)
-        file_handler.setFormatter(formatter)
-        file_handler.setLevel(logging.DEBUG)
-        logger.addHandler(file_handler)
+        # Debug file handler
+        debug_handler = logging.FileHandler(log_dir / filename)
+        debug_handler.setFormatter(formatter)
+        debug_handler.setLevel(logging.DEBUG)
+        logger.addHandler(debug_handler)
+        
+        # Error file handler
+        error_handler = logging.FileHandler(log_dir / f"error_{filename}")
+        error_handler.setFormatter(error_formatter)
+        error_handler.setLevel(logging.ERROR)
+        logger.addHandler(error_handler)
     
     # Quiet noisy loggers
     logging.getLogger('urllib3').setLevel(logging.WARNING)
@@ -92,7 +102,7 @@ def clean_kvk_number(kvk):
         logger.error(f"Error cleaning KvK number {kvk}: {str(e)}")
         return None
 
-def create_big_company_database(input_file, db_path="companies.db", start_index=None, end_index=None, retry_failed=False):
+def create_big_company_database(input_file, db_path="companies.db", start_index=None, end_index=None, retry_failed=False, retry_small=False):
     """
     Process companies and store results in SQL database
     Args:
@@ -100,7 +110,8 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
         db_path: Path to SQLite database
         start_index: Optional starting index for processing (inclusive)
         end_index: Optional ending index for processing (exclusive)
-        retry_failed: If True, retry companies that previously returned None
+        retry_failed: If True, retry companies that previously returned None (-1)
+        retry_small: If True, retry companies that were marked as having no branches (0)
     """
     logger.info(f"Reading input file: {input_file}")
     df = pd.read_csv(input_file)
@@ -142,10 +153,12 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
                     pbar.update(1)
                     continue
                     
-                # Skip if already checked, unless it's a failed result and we want to retry
+                # Skip if already checked, unless we want to retry
                 if db.has_been_checked(kvk):
-                    if retry_failed and db.is_failed_result(kvk):
-                        logger.debug(f"Retrying previously failed {company_name} (KvK {kvk})")
+                    should_retry = (retry_failed and db.is_failed_result(kvk)) or \
+                                 (retry_small and db.is_no_branches_result(kvk))
+                    if should_retry:
+                        logger.debug(f"Retrying {company_name} (KvK {kvk})")
                     else:
                         stats['skipped_already_checked'] += 1
                         logger.debug(f"Already processed {company_name} (KvK {kvk})")
@@ -153,21 +166,34 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
                         continue
                 
                 try:
-                    # Process and store immediately
+                    logger.debug(f"Processing company {company_name} ({kvk})")
                     result = scraper.check_company_size(company_name, kvk)
-                    if result is not None:
+                    
+                    # Extra safety check for rate limits
+                    if hasattr(scraper, 'driver') and scraper.is_rate_limited(scraper.driver.page_source):
+                        logger.error("Rate limit detected in final check")
+                        raise RateLimitException("Rate limit detected in final validation")
+                        
+                    if result is not None:  # Valid response (True/False)
                         stats['stored_true' if result else 'stored_false'] += 1
                         db.store_result(company_name, kvk, result)
-                        logger.debug(f"Stored result for {company_name} (KvK {kvk}): {result}")
-                    else:
+                        logger.debug(f"Stored valid result: {result}")
+                    else:  # Error occurred (None)
                         stats['none_results'] += 1
-                        db.store_result(company_name, kvk, -1)  # Store None results as -1
-                        logger.debug(f"Got None result for {company_name} (KvK {kvk})")
+                        db.store_result(company_name, kvk, -1)  # -1 only for errors
+                        logger.debug("Stored error result (-1)")
                     pbar.update(1)
-                except RateLimitException:
-                    logger.error(f"Rate limit reached. Stopping at index {current_index}")
-                    logger.error("To resume, use: --start-index {}".format(current_index))
+                    
+                except RateLimitException as e:
+                    logger.error(f"Rate limit exception: {str(e)}")
+                    logger.error(f"Stopping at index {current_index}")
                     raise  # Re-raise to exit processing
+                    
+                except Exception as e:
+                    logger.error(f"Unexpected error: {str(e)}")
+                    stats['none_results'] += 1
+                    db.store_result(company_name, kvk, -1)
+                    pbar.update(1)
     
     except RateLimitException:
         logger.info("Exiting due to rate limit...")
@@ -186,12 +212,14 @@ if __name__ == "__main__":
     parser.add_argument('--log-dir', type=str, default=None,
                        help='Directory to store log files (default: ./logs/kvk_scraper_TIMESTAMP_pidNUM/)')
     parser.add_argument('--retry-failed', action='store_true', 
-                       help='Retry processing companies that previously failed')
+                       help='Retry processing companies that previously failed (-1)')
+    parser.add_argument('--retry-small', action='store_true',
+                       help='Retry processing companies previously marked as having no branches (0)')
     
     args = parser.parse_args()
     setup_logging(log_dir=args.log_dir)
     logger = logging.getLogger(__name__)
     
     logger.info("Starting company processing")
-    create_big_company_database(args.input_file, args.db_path, args.start_index, args.end_index, args.retry_failed)
+    create_big_company_database(args.input_file, args.db_path, args.start_index, args.end_index, args.retry_failed, args.retry_small)
     logger.info("Processing complete")

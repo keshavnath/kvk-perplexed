@@ -40,6 +40,16 @@ class CompanyDB:
             result = cursor.fetchone()
             return result is not None
 
+    def is_no_branches_result(self, kvk_number):
+        """Check if a company was marked as having no branches (0)"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                'SELECT has_branches FROM companies WHERE kvk_number = ? AND has_branches = 0', 
+                (kvk_number,)
+            )
+            result = cursor.fetchone()
+            return result is not None
+
     def store_result(self, company_name, kvk_number, has_branches):
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
