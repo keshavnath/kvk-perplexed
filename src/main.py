@@ -190,6 +190,10 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
                     raise  # Re-raise to exit processing
                     
                 except Exception as e:
+                    if 'invalid session id' in str(e):
+                        logger.error(f"Browser session disconnected at index {current_index}")
+                        logger.error(f"Last company processed: {company_name} (KvK {kvk})")
+                        raise  # Stop processing
                     logger.error(f"Unexpected error: {str(e)}")
                     stats['none_results'] += 1
                     db.store_result(company_name, kvk, -1)
@@ -197,6 +201,11 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
     
     except RateLimitException:
         logger.info("Exiting due to rate limit...")
+    except Exception as e:
+        if 'invalid session id' in str(e):
+            logger.info(f"Exiting due to browser disconnection at index {current_index}")
+        else:
+            logger.error(f"Fatal error: {str(e)}")
     finally:
         # Log statistics even if we hit rate limit
         logger.info("Processing statistics (up to index {}):".format(current_index))
