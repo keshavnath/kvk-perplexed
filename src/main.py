@@ -62,10 +62,10 @@ def setup_logging(level=logging.INFO, log_dir=None):
         logger.addHandler(debug_handler)
         
         # Error file handler
-        error_handler = logging.FileHandler(log_dir / f"error_{filename}")
-        error_handler.setFormatter(error_formatter)
-        error_handler.setLevel(logging.ERROR)
-        logger.addHandler(error_handler)
+        # error_handler = logging.FileHandler(log_dir / f"error_{filename}")
+        # error_handler.setFormatter(error_formatter)
+        # error_handler.setLevel(logging.ERROR)
+        # logger.addHandler(error_handler)
     
     # Quiet noisy loggers
     logging.getLogger('urllib3').setLevel(logging.WARNING)

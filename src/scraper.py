@@ -24,39 +24,28 @@ class CompanyScraper:
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
             
-            # First check title for rate limit page
+            # Critical: Check title first as it's the most reliable indicator
             title = soup.find('title')
-            if title:
-                title_text = title.text.strip()
-                logger.debug(f"Page title: '{title_text}'")
-                if 'too many requests' in title_text.lower() or '429' in title_text:
-                    logger.warning(f"Rate limit detected in title: {title_text}")
-                    return True
+            if title and 'Too many requests' in title.text:
+                logger.error(f"Rate limit detected in title: '{title.text}'")
+                return True
             
-            # Then check for rate limit message
+            # Fallback checks
             message_div = soup.find('div', id='message')
             if message_div:
-                message_text = message_div.get_text().lower()
-                logger.debug(f"Found message div: '{message_text}'")
-                
-                rate_limit_phrases = [
+                message_text = message_div.get_text()
+                logger.debug(f"Found message: '{message_text}'")
+                if any(phrase in message_text.lower() for phrase in [
                     'higher than expected rate',
-                    'accessing opencorporates at a higher than expected rate',
-                    'ip address may be accessing opencorporates at a higher',
-                    'rate limit',
-                    'too many requests'
-                ]
-                
-                for phrase in rate_limit_phrases:
-                    if phrase in message_text:
-                        logger.warning(f"Rate limit detected with phrase: '{phrase}'")
-                        return True
-            
+                    'too many requests',
+                    'rate limit'
+                ]):
+                    logger.error(f"Rate limit detected in message: '{message_text}'")
+                    return True
             return False
         except Exception as e:
-            logger.error(f"Error in rate limit check: {str(e)}")
-            logger.debug(f"HTML content: {html_content[:500]}...")
-            return False
+            logger.error(f"Error checking rate limit: {str(e)}")
+            return False  # Don't raise on parse errors
 
     def __init__(self):
         self.base_url = "https://opencorporates.com/companies/nl/"
@@ -82,53 +71,40 @@ class CompanyScraper:
         self.wait = WebDriverWait(self.driver, 10)
     
     def check_company_size(self, company_name, kvk_number, max_retries=3):
-        """Check company size with proxy rotation and rate limit handling"""
-        last_exception = None
-        
+        """Primary entry point for checking company size"""
         for attempt in range(max_retries):
             try:
-                if attempt > 0:  # On retry, get new proxy
+                if attempt > 0:
                     proxy = self.proxy_manager.get_proxy()
                     if not proxy:
-                        logger.error("No working proxies available")
                         raise RateLimitException("No working proxies available")
-                    logger.info(f"Retrying with new proxy: {proxy}")
+                    logger.info(f"Attempt {attempt + 1}: Using proxy {proxy}")
                     self.setup_browser(proxy)
-                
-                return self._check_company_size_impl(company_name, kvk_number)
-                
+
+                result = self._check_company_size_impl(company_name, kvk_number)
+                return result
+
             except RateLimitException as e:
-                last_exception = e
-                logger.warning(f"Rate limit with current proxy (attempt {attempt + 1}/{max_retries})")
+                logger.error(f"Rate limit on attempt {attempt + 1}: {str(e)}")
                 if attempt == max_retries - 1:
-                    logger.error("Rate limit persists after all retries")
-                continue
-            
-            except Exception as e:
-                last_exception = e
-                logger.error(f"Error on attempt {attempt + 1}: {str(e)}")
-                break
-        
-        if isinstance(last_exception, RateLimitException):
-            raise last_exception
-        return None
-    
+                    logger.error("All retries exhausted")
+                    raise  # Re-raise on final attempt
+                continue  # Try next proxy
+
     def _check_company_size_impl(self, company_name, kvk_number):
-        """Implementation of the actual check"""
+        """Implementation that does the actual check"""
         try:
             url = f"{self.base_url}{kvk_number}"
-            logger.debug(f"Requesting URL: {url}")
+            logger.debug(f"Requesting {url}")
             
             self.driver.get(url)
-            time.sleep(2)
+            time.sleep(2)  # Allow page to load
             
             page_source = self.driver.page_source
-            logger.debug(f"Got response for {kvk_number}, length: {len(page_source)}")
             
-            # Check rate limit BEFORE any other processing
+            # Check rate limit before any processing
             if self.is_rate_limited(page_source):
-                logger.error(f"Rate limit detected for {kvk_number}")
-                raise RateLimitException(f"Rate limit detected for {kvk_number}")
+                raise RateLimitException(f"Rate limit hit for {company_name} (KvK {kvk_number})")
             
             # Only continue if not rate limited
             soup = BeautifulSoup(page_source, 'html.parser')
@@ -140,7 +116,7 @@ class CompanyScraper:
                 return None
                 
             title_text = title.text.lower()
-            logger.debug(f"Page title: {title_text}")
+            # logger.debug(f"Page title: {title_text}")
             
             if 'opencorporates' not in title_text:
                 logger.error(f"Not on OpenCorporates page for {kvk_number}")
@@ -172,11 +148,10 @@ class CompanyScraper:
             
             return has_branches  # Will be False if no branch indicators found
         
-        except RateLimitException as e:
-            logger.error(f"Rate limit caught: {str(e)}")
-            raise  # Re-raise to ensure it's caught by check_company_size
+        except RateLimitException:
+            raise  # Always re-raise rate limit exceptions
         except Exception as e:
-            logger.error(f"Error in branch check: {str(e)}")
+            logger.error(f"Unexpected error: {str(e)}")
             return None
     
     def __del__(self):
