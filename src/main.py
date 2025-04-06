@@ -23,25 +23,20 @@ def setup_logging(level=logging.INFO, log_dir=None):
     else:
         log_dir = get_default_log_directory()
 
-    # Create formatters for different levels
+    # Create formatters
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    error_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s\nStack trace:\n%(exc_info)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
     # Setup root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.DEBUG)  # Capture all levels
+    root_logger.setLevel(level)
     
-    # Console handler - for main module, show INFO and above
+    # Console handler - for main module
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     console_handler.addFilter(lambda record: record.name == "__main__")
-    console_handler.setLevel(logging.INFO)
     root_logger.addHandler(console_handler)
     
     # Configure module loggers
@@ -51,25 +46,28 @@ def setup_logging(level=logging.INFO, log_dir=None):
         'proxy': 'proxy.log'
     }
     
+    # Add error logger for fatal errors
+    error_logger = logging.getLogger('error')
+    error_handler = logging.FileHandler(log_dir / 'fatal_errors.log')
+    error_handler.setFormatter(formatter)
+    error_handler.setLevel(logging.ERROR)
+    error_logger.addHandler(error_handler)
+    error_logger.setLevel(logging.ERROR)
+    
     for module, filename in modules.items():
         logger = logging.getLogger(module)
-        logger.setLevel(logging.DEBUG)  # Capture all levels
+        logger.setLevel(logging.DEBUG)
         
-        # Debug file handler
-        debug_handler = logging.FileHandler(log_dir / filename)
-        debug_handler.setFormatter(formatter)
-        debug_handler.setLevel(logging.DEBUG)
-        logger.addHandler(debug_handler)
-        
-        # Error file handler
-        # error_handler = logging.FileHandler(log_dir / f"error_{filename}")
-        # error_handler.setFormatter(error_formatter)
-        # error_handler.setLevel(logging.ERROR)
-        # logger.addHandler(error_handler)
+        file_handler = logging.FileHandler(log_dir / filename)
+        file_handler.setFormatter(formatter)
+        file_handler.setLevel(logging.DEBUG)
+        logger.addHandler(file_handler)
     
     # Quiet noisy loggers
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('requests').setLevel(logging.WARNING)
+    
+    return error_logger  # Return error logger for fatal errors
 
 def clean_kvk_number(kvk):
     """Clean and standardize KvK number format.
@@ -140,6 +138,8 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
     }
     
     current_index = start if start_index is not None else 0
+    error_logger = logging.getLogger('error')
+    
     try:
         with tqdm(total=total_companies, desc="Processing companies", unit="company") as pbar:
             for idx, (_, row) in enumerate(df.iterrows()):
@@ -185,32 +185,37 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
                     pbar.update(1)
                     
                 except RateLimitException as e:
-                    logger.error(f"Rate limit exception: {str(e)}")
-                    logger.error(f"Stopping at index {current_index}")
-                    raise  # Re-raise to exit processing
+                    error_msg = f"Rate limit reached at index {current_index}. Last company: {company_name} (KvK {kvk})"
+                    logger.error(error_msg)
+                    error_logger.error(error_msg)
+                    raise
                     
                 except Exception as e:
                     if 'invalid session id' in str(e):
-                        logger.error(f"Browser session disconnected at index {current_index}")
-                        logger.error(f"Last company processed: {company_name} (KvK {kvk})")
-                        raise  # Stop processing
+                        error_msg = f"Browser session disconnected at index {current_index}. Last company: {company_name} (KvK {kvk})"
+                        logger.error(error_msg)
+                        error_logger.error(error_msg)
+                        raise
                     logger.error(f"Unexpected error: {str(e)}")
                     stats['none_results'] += 1
                     db.store_result(company_name, kvk, -1)
                     pbar.update(1)
     
     except RateLimitException:
-        logger.info("Exiting due to rate limit...")
+        error_logger.error(f"Exiting due to rate limit at index {current_index}")
     except Exception as e:
         if 'invalid session id' in str(e):
-            logger.info(f"Exiting due to browser disconnection at index {current_index}")
+            error_logger.error(f"Exiting due to browser disconnection at index {current_index}")
         else:
-            logger.error(f"Fatal error: {str(e)}")
+            error_logger.error(f"Fatal error at index {current_index}: {str(e)}")
     finally:
-        # Log statistics even if we hit rate limit
-        logger.info("Processing statistics (up to index {}):".format(current_index))
+        # Log statistics to both main and error loggers
+        stats_message = f"Processing statistics (up to index {current_index}):"
         for key, value in stats.items():
-            logger.info(f"  {key}: {value}")
+            stats_message += f"\n  {key}: {value}"
+        
+        logger.info(stats_message)
+        error_logger.error(stats_message)  # Include in fatal errors log
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Process companies and store results in database')
@@ -226,7 +231,7 @@ if __name__ == "__main__":
                        help='Retry processing companies previously marked as having no branches (0)')
     
     args = parser.parse_args()
-    setup_logging(log_dir=args.log_dir)
+    error_logger = setup_logging(log_dir=args.log_dir)
     logger = logging.getLogger(__name__)
     
     logger.info("Starting company processing")
