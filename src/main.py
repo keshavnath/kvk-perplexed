@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 from database import CompanyDB
 from pathlib import Path
-from scraper import CompanyScraper, RateLimitException
+from scraper import CompanyScraper, RateLimitException, TimeoutException
 
 def get_default_log_directory():
     """Generate default log directory with timestamp and process ID"""
@@ -184,8 +184,8 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
                         logger.debug("Stored error result (-1)")
                     pbar.update(1)
                     
-                except RateLimitException as e:
-                    error_msg = f"Rate limit reached at index {current_index}. Last company: {company_name} (KvK {kvk})"
+                except (RateLimitException, TimeoutException) as e:
+                    error_msg = f"Error at index {current_index}. Last company: {company_name} (KvK {kvk}). Error: {str(e)}"
                     logger.error(error_msg)
                     error_logger.error(error_msg)
                     raise

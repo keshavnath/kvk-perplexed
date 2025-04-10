@@ -17,6 +17,10 @@ class RateLimitException(Exception):
     """Raised when rate limiting is detected"""
     pass
 
+class TimeoutException(Exception):
+    """Raised when connection times out"""
+    pass
+
 class CompanyScraper:
     @staticmethod
     def is_rate_limited(html_content):
@@ -84,8 +88,8 @@ class CompanyScraper:
                 result = self._check_company_size_impl(company_name, kvk_number)
                 return result
 
-            except RateLimitException as e:
-                logger.error(f"Rate limit on attempt {attempt + 1}: {str(e)}")
+            except (RateLimitException, TimeoutException) as e:
+                logger.error(f"Error on attempt {attempt + 1}: {str(e)}")
                 if attempt == max_retries - 1:
                     logger.error("All retries exhausted")
                     raise  # Re-raise on final attempt
@@ -97,10 +101,21 @@ class CompanyScraper:
             url = f"{self.base_url}{kvk_number}"
             logger.debug(f"Requesting {url}")
             
-            self.driver.get(url)
-            time.sleep(2)  # Allow page to load
+            try:
+                self.driver.get(url)
+                time.sleep(2)  # Allow page to load
+            except Exception as e:
+                if 'timeout' in str(e).lower() or 'read timed out' in str(e).lower():
+                    logger.error(f"Connection timeout for {company_name} (KvK {kvk_number})")
+                    raise TimeoutException(f"Connection timeout: {str(e)}")
+                raise  # Re-raise other exceptions
             
             page_source = self.driver.page_source
+            
+            # Check for valid response
+            if not page_source or len(page_source.strip()) < 100:  # Basic check for valid content
+                logger.error(f"Empty or invalid response for {company_name} (KvK {kvk_number})")
+                raise TimeoutException("Empty or invalid response")
             
             # Check rate limit before any processing
             if self.is_rate_limited(page_source):
