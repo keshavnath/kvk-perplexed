@@ -21,6 +21,10 @@ class TimeoutException(Exception):
     """Raised when connection times out"""
     pass
 
+class ProxyConnectionException(Exception):
+    """Raised when proxy connection fails"""
+    pass
+
 class CompanyScraper:
     @staticmethod
     def is_rate_limited(html_content):
@@ -88,7 +92,7 @@ class CompanyScraper:
                 result = self._check_company_size_impl(company_name, kvk_number)
                 return result
 
-            except (RateLimitException, TimeoutException) as e:
+            except (RateLimitException, TimeoutException, ProxyConnectionException) as e:
                 logger.error(f"Error on attempt {attempt + 1}: {str(e)}")
                 if attempt == max_retries - 1:
                     logger.error("All retries exhausted")
@@ -104,7 +108,15 @@ class CompanyScraper:
             try:
                 self.driver.get(url)
                 time.sleep(2)  # Allow page to load
+
+                # Check for proxy connection error
+                error_text = self.driver.page_source.lower()
+                if 'err_proxy_connection_failed' in error_text:
+                    raise ProxyConnectionException("Proxy connection failed")
+                
             except Exception as e:
+                if 'proxy connection failed' in str(e).lower():
+                    raise ProxyConnectionException(str(e))
                 if 'timeout' in str(e).lower() or 'read timed out' in str(e).lower():
                     logger.error(f"Connection timeout for {company_name} (KvK {kvk_number})")
                     raise TimeoutException(f"Connection timeout: {str(e)}")

@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 from database import CompanyDB
 from pathlib import Path
-from scraper import CompanyScraper, RateLimitException, TimeoutException
+from scraper import CompanyScraper, RateLimitException, TimeoutException, ProxyConnectionException
 
 def get_default_log_directory():
     """Generate default log directory with timestamp and process ID"""
@@ -169,26 +169,21 @@ def create_big_company_database(input_file, db_path="companies.db", start_index=
                     logger.debug(f"Processing company {company_name} ({kvk})")
                     result = scraper.check_company_size(company_name, kvk)
                     
-                    # Extra safety check for rate limits
-                    if hasattr(scraper, 'driver') and scraper.is_rate_limited(scraper.driver.page_source):
-                        logger.error("Rate limit detected in final check")
-                        raise RateLimitException("Rate limit detected in final validation")
-                        
                     if result is not None:  # Valid response (True/False)
                         stats['stored_true' if result else 'stored_false'] += 1
                         db.store_result(company_name, kvk, result)
                         logger.debug(f"Stored valid result: {result}")
                     else:  # Error occurred (None)
                         stats['none_results'] += 1
-                        db.store_result(company_name, kvk, -1)  # -1 only for errors
+                        db.store_result(company_name, kvk, -1)
                         logger.debug("Stored error result (-1)")
                     pbar.update(1)
                     
-                except (RateLimitException, TimeoutException) as e:
-                    error_msg = f"Error at index {current_index}. Last company: {company_name} (KvK {kvk}). Error: {str(e)}"
+                except (RateLimitException, TimeoutException, ProxyConnectionException) as e:
+                    error_msg = f"Connection error at index {current_index}. Last company: {company_name} (KvK {kvk}). Error: {str(e)}"
                     logger.error(error_msg)
                     error_logger.error(error_msg)
-                    raise
+                    raise  # Re-raise to exit processing
                     
                 except Exception as e:
                     if 'invalid session id' in str(e):
