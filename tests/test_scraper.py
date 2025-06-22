@@ -10,7 +10,7 @@ import pytest
 # Add project root to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.scraper import CompanyScraper, RateLimitException
+from src.scraper import CompanyScraper, RateLimitException, TimeoutException, RetryableError, ProxyConnectionException
 
 class TestRateLimit(unittest.TestCase):
     def setUp(self):

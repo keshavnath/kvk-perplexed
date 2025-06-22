@@ -13,15 +13,19 @@ from proxy_manager import ProxyManager
 logger = logging.getLogger('scraper')
 logger.setLevel(logging.DEBUG)
 
-class RateLimitException(Exception):
+class RetryableError(Exception):
+    """Base class for errors that should trigger a retry"""
+    pass
+
+class RateLimitException(RetryableError):
     """Raised when rate limiting is detected"""
     pass
 
-class TimeoutException(Exception):
+class TimeoutException(RetryableError):
     """Raised when connection times out"""
     pass
 
-class ProxyConnectionException(Exception):
+class ProxyConnectionException(RetryableError):
     """Raised when proxy connection fails"""
     pass
 
@@ -78,7 +82,7 @@ class CompanyScraper:
         self.driver = webdriver.Chrome(options=chrome_options)
         self.wait = WebDriverWait(self.driver, 10)
     
-    def check_company_size(self, company_name, kvk_number, max_retries=3):
+    def check_company_size(self, company_name, kvk_number, max_retries=10):
         """Primary entry point for checking company size"""
         for attempt in range(max_retries):
             try:
@@ -107,25 +111,20 @@ class CompanyScraper:
             
             try:
                 self.driver.get(url)
-                time.sleep(2)  # Allow page to load
-
-                # Check for proxy connection error
-                error_text = self.driver.page_source.lower()
-                if 'err_proxy_connection_failed' in error_text:
-                    raise ProxyConnectionException("Proxy connection failed")
-                
+                time.sleep(2)
             except Exception as e:
-                if 'proxy connection failed' in str(e).lower():
-                    raise ProxyConnectionException(str(e))
-                if 'timeout' in str(e).lower() or 'read timed out' in str(e).lower():
-                    logger.error(f"Connection timeout for {company_name} (KvK {kvk_number})")
+                if any(error in str(e).lower() for error in ['timeout', 'read timed out', 'connection refused']):
+                    logger.error(f"Connection timeout for {company_name} (KvK {kvk_number}): {str(e)}")
                     raise TimeoutException(f"Connection timeout: {str(e)}")
+                elif 'proxy connection failed' in str(e).lower():
+                    logger.error(f"Proxy connection failure for {company_name} (KvK {kvk_number})")
+                    raise ProxyConnectionException(str(e))
                 raise  # Re-raise other exceptions
             
             page_source = self.driver.page_source
             
             # Check for valid response
-            if not page_source or len(page_source.strip()) < 100:  # Basic check for valid content
+            if not page_source or len(page_source.strip()) < 100:
                 logger.error(f"Empty or invalid response for {company_name} (KvK {kvk_number})")
                 raise TimeoutException("Empty or invalid response")
             
