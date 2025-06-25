@@ -29,6 +29,8 @@ This project consists of two main phases:
    ```
 
 ## Usage
+
+### Phase 1: Branch Analysis
 Basic usage:
 ```bash
 python src/main.py input.csv
@@ -45,6 +47,40 @@ Example:
 ```bash
 python src/main.py companies.csv --start-index 100 --retry-failed
 ```
+
+### Phase 2: Perplexity Analysis
+Process companies with branches to get detailed information:
+
+```bash
+python src/phase2_processor.py
+```
+
+Options:
+- `--phase1-db`: Path to Phase 1 database (default: ./db/companies.db)
+- `--phase2-db`: Path to Phase 2 database (default: ./db/company_details.db)
+- `--max-companies`: Maximum number of companies to process
+- `--delay`: Delay between API calls in seconds (default: 1.0)
+- `--log-dir`: Directory for log files
+
+Examples:
+```bash
+# Process all companies with branches
+python src/phase2_processor.py
+
+# Process only 10 companies with 2-second delays
+python src/phase2_processor.py --max-companies 10 --delay 2.0
+
+# Use custom database paths
+python src/phase2_processor.py --phase1-db ./data/companies.db --phase2-db ./data/details.db
+```
+
+**Note**: Before running Phase 2, ensure you have:
+1. A `.env` file with your Perplexity API key:
+   ```
+   PERPLEXITY_API_KEY=your_api_key_here
+   PERPLEXITY_MODEL=sonar
+   ```
+2. Completed Phase 1 processing with companies that have branches
 
 ## Input Format
 The input CSV file should contain at least these columns:
