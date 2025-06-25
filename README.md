@@ -92,18 +92,21 @@ python -m pytest
 Run specific test categories using markers:
 ```bash
 pytest -m rate_limit     # Only rate limit tests
-pytest -m branches       # Only branch detection tests
+pytest -m branches       # Only branch detection tests  
+pytest -m phase2         # Only phase 2 processing tests
 ```
 
 Run tests by name matching:
 ```bash
 pytest -k "rate"        # Run any test with "rate" in the name
-pytest -k "TestRateLimit"  # Run specific test class
+pytest -k "TestPhase2"  # Run Phase 2 processor tests
+pytest -k "phase2"      # Run all Phase 2 related tests
 ```
 
 Test files:
 - `test_scraper.py`: Tests for scraping and rate limit detection
 - `test_proxy_manager.py`: Tests for proxy handling
+- `test_phase2.py`: Tests for Phase 2 processing, Perplexity integration, and data models
 
 ## Project Status
 
@@ -113,32 +116,42 @@ Test files:
 - Failed result tracking and retry capability
 - Detailed logging system
 - Progress tracking and statistics
+- **Phase 2: Perplexity integration for detailed company analysis**
+- **Structured data extraction with confidence scoring**
 
-### Planned Features
-- Integration with Perplexity for detailed company analysis
-- Extended database schema for company details
-- Rich company profiles including:
-  - Geographic data
-  - Industry classification
-  - Size metrics
-  - Business relationships
-- Analysis and export tools for collected data
+### Phase 2 Features
+- Integration with Perplexity API for detailed company research
+- Industry classification from predefined categories
+- Employee count estimation in structured ranges
+- Headquarters location identification
+- Business description generation
+- Confidence scoring for data quality assessment
+- Separate database for enriched company data
 
 ## Technical Details
 
-### Current Database Schema
+### Phase 1 Database Schema
 The SQLite database currently stores:
 - Company name
 - KvK number
 - Branch status (true/false/-1 for failed checks)
 
-### Future Schema Extensions (Planned)
-Will be extended to include:
-- Company location data
-- Industry classifications
-- Size indicators
-- Last update timestamps
-- Data confidence metrics
+### Phase 2 Database Schema
+Extended company details database includes:
+- KvK number (cross-reference key)
+- Company name
+- Industry classifications (1-3 categories)
+- Employee range estimates
+- Headquarters location
+- Business description
+- Confidence score (0.0-1.0)
+- Timestamps for data tracking
+
+### Supported Industries
+Technology & Software, Financial Services, Manufacturing, Healthcare & Pharmaceuticals, Energy & Utilities, Construction & Real Estate, Transportation & Logistics, Retail & E-commerce, Food & Beverages, Education, Professional Services, Media & Entertainment, Telecommunications, Agriculture, Tourism & Hospitality, Automotive, Chemical & Materials, Aerospace & Defense, Government & Public Sector, Non-profit
+
+### Employee Ranges
+1-10, 11-50, 51-200, 201-500, 501-1000, 1001-5000, 5000+
 
 ## Notes
 - Processing speed is limited due to web scraping
