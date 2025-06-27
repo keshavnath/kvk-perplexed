@@ -119,6 +119,23 @@ The dashboard features:
 
 **Note**: The web dashboard will open in your browser at `http://localhost:8501`
 
+#### Streamlit Cloud Deployment
+Deploy your dashboard to Streamlit Cloud for private sharing:
+
+1. **Encode your database**:
+   ```bash
+   python src/encode_db.py ./db/company_details.db
+   ```
+
+2. **Setup secrets**: Copy the encoded output to your Streamlit Cloud app secrets
+
+3. **Deploy**: Use `web_dashboard_secrets.py` for deployment:
+   ```bash
+   streamlit run src/web_dashboard_secrets.py
+   ```
+
+The deployed app will automatically load data from secrets without requiring file uploads.
+
 ## Input Format
 The input CSV file should contain at least these columns:
 - `kvk_number`: KvK registration number

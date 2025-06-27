@@ -72,8 +72,10 @@ db.sqlite3
 db.sqlite3-journal
 # Database files
 *.db
-*.sql
+*.sqlite
+*.sqlite3
 db/
+secrets_database.txt
 
 # Flask stuff:
 instance/
@@ -186,3 +188,40 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Streamlit secrets
+.streamlit/secrets.toml
+secrets_database.txt
+
+# Environment files
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Encoding utility output
+src/secrets_database.txt
