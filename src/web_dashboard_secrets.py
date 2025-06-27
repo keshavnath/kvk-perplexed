@@ -6,19 +6,38 @@ import plotly.express as px
 import tempfile
 import os
 import base64
+import gzip
 
 st.set_page_config(page_title="Dutch Company Database", layout="wide")
 
 @st.cache_data
 def load_data_from_secrets():
-    """Load and cache company data from base64 encoded database in secrets"""
+    """Load and cache company data from compressed base64 encoded database in secrets"""
     try:
-        # Get base64 encoded database from secrets
-        db_base64 = st.secrets["database"]["data"]
+        # Get compressed base64 encoded database from secrets
+        try:
+            compressed_data = st.secrets["database"]["compressed_data"]
+        except KeyError:
+            # Fallback to old format for backward compatibility
+            try:
+                # Try to decompress old format first
+                old_data = st.secrets["database"]["data"]
+                db_data = base64.b64decode(old_data)
+            except:
+                st.error("Database secrets not found. Please check your secrets configuration.")
+                return None
+        else:
+            # Decode from base64
+            compressed_bytes = base64.b64decode(compressed_data)
+            
+            # Decompress
+            try:
+                db_data = gzip.decompress(compressed_bytes)
+            except gzip.BadGzipFile:
+                # Fallback: data might not be compressed
+                db_data = compressed_bytes
         
-        # Decode and create temporary file
-        db_data = base64.b64decode(db_base64)
-        
+        # Create temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.db') as tmp_file:
             tmp_file.write(db_data)
             tmp_file_path = tmp_file.name
