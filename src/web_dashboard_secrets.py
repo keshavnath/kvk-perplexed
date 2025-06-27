@@ -52,8 +52,20 @@ def load_data_from_secrets():
                 
                 return df
         finally:
-            # Clean up temporary file
-            os.unlink(tmp_file_path)
+            # Clean up temporary file with retry logic
+            try:
+                if os.path.exists(tmp_file_path):
+                    os.unlink(tmp_file_path)
+            except PermissionError:
+                # File might still be locked, try again after a short delay
+                import time
+                time.sleep(0.1)
+                try:
+                    if os.path.exists(tmp_file_path):
+                        os.unlink(tmp_file_path)
+                except:
+                    # If we still can't delete it, just leave it (temp files are cleaned up eventually)
+                    pass
             
     except Exception as e:
         st.error(f"Error loading database from secrets: {str(e)}")
