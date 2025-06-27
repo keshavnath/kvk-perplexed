@@ -3,13 +3,10 @@
 A tool for analyzing Dutch companies based on their branch structure and collecting detailed company information using OpenCorporates and Perplexity.
 
 ## Overview
-This project consists of two main phases:
-1. **Current Phase (Branch Analysis)**: Identifies "big" companies by analyzing their branch/subsidiary structure using OpenCorporates data
-2. **Future Phase (Company Details)**: Will collect detailed information about identified big companies using Perplexity, including:
-   - Location and geographic distribution
-   - Industry sector and subsectors
-   - Company size estimates (employees, revenue)
-   - Additional business intelligence
+This project consists of three main phases:
+1. **Phase 1 (Branch Analysis)**: Identifies "big" companies by analyzing their branch/subsidiary structure using OpenCorporates data
+2. **Phase 2 (Company Details)**: Collects detailed information about identified big companies using Perplexity, including industry, employee estimates, and business intelligence
+3. **Phase 3 (Export & Visualization)**: Exports and visualizes the enriched data through Excel reports and interactive web dashboards
 
 ## Requirements
 - Python 3.7+
@@ -81,6 +78,46 @@ python src/phase2_processor.py --phase1-db ./data/companies.db --phase2-db ./dat
    PERPLEXITY_MODEL=sonar
    ```
 2. Completed Phase 1 processing with companies that have branches
+
+### Phase 3: Data Export and Visualization
+Export and visualize the enriched company data from Phase 2:
+
+#### Excel Export
+Export company details to Excel with multiple sheets for analysis:
+```bash
+python src/export_to_excel.py
+```
+
+Options:
+- `--db-path`: Path to company details database (default: ./db/company_details.db)
+- `--output`: Output Excel filename (default: company_details.xlsx)
+
+Example:
+```bash
+python src/export_to_excel.py --db-path ./db/company_details.db --output my_companies.xlsx
+```
+
+The Excel file includes:
+- **Company Details**: Main data with parsed industries
+- **Summary**: Processing statistics and metrics
+- **Industries**: Industry breakdown and counts
+- **Employee Ranges**: Employee range distribution
+
+#### Interactive Web Dashboard
+Launch an interactive web dashboard to explore and filter company data:
+```bash
+pip install streamlit plotly
+streamlit run src/web_dashboard.py
+```
+
+The dashboard features:
+- Real-time filtering by confidence score, employee range, and industries
+- Interactive charts showing industry and confidence score distributions
+- Downloadable filtered results as CSV
+- Customizable column display
+- Company metrics and statistics
+
+**Note**: The web dashboard will open in your browser at `http://localhost:8501`
 
 ## Input Format
 The input CSV file should contain at least these columns:
